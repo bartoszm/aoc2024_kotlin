@@ -21,3 +21,12 @@ fun String.md5() = BigInteger(1, MessageDigest.getInstance("MD5").digest(toByteA
  * The cleaner shorthand for printing output.
  */
 fun Any?.println() = println(this)
+
+
+fun <T> List<T>.toPair(): Pair<T, T> {
+    require(this.size == 2) { "List $this is not of length 2!" }
+    val (a, b) = this
+    return Pair(a, b)
+}
+
+fun <T> List<String>.convert(converter: (String) -> List<T>) = this.map(converter)
