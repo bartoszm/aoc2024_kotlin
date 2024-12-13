@@ -3,13 +3,14 @@ package day12
 import utils.println
 import utils.readInput
 
+typealias Point = Pair<Int, Int>
 
 fun parse(input: List<String>): Array<CharArray> {
     return input.map { it.toCharArray() }.toTypedArray()
 }
 
 class Region(val c: Char) {
-    val coordinates = mutableSetOf<Pair<Int, Int>>()
+    val coordinates = mutableSetOf<Point>()
 
     val size: Int
         get() = coordinates.size
@@ -74,9 +75,71 @@ fun main() {
     }
 
 
+
+
+
     fun part2(input: List<String>): Int {
+
+        fun Region.bounds(): Pair<Point, Point> {
+            val x = coordinates.map { it.first }
+            val y = coordinates.map { it.second }
+            return (x.min() to y.min()) to (x.max() to y.max())
+        }
+
+        fun Region.inBounds(p: Point): Boolean {
+            val (tl, br) = this.bounds()
+            return p.first in tl.first..br.first && p.second in tl.second..br.second
+        }
+
+
+        fun Region.collect(start: Point, next: (Point)-> Point, prev: (Point) -> Point): List<Point> {
+            var curr = start
+            return sequence {
+                while(inBounds(curr)) {
+                    if(coordinates.contains(curr) && !coordinates.contains(prev(curr))) {
+                        yield(curr)
+                    }
+                    curr = next(curr)
+                }
+            }.toList()
+
+        }
+
+        fun List<Int>.countConsecutive(): Int {
+            if(this.size == 1) return 1
+            return this.sorted().windowed(2)
+                .map { it[1] - it[0] }
+                .count { it > 1 } + 1
+        }
+
+        fun List<Point>.countEdges(): Int {
+            return this.groupBy({ it.second }, { it.first }).values.sumOf { it.countConsecutive() }
+        }
+
         fun Region.perimeter(): Int {
-            return 1
+
+            val (tl, br) = this.bounds()
+
+            val ledge = (tl.first..br.first).flatMap {
+                this.collect(it to tl.second, { (x, y) -> x to y + 1 }, { (x, y) -> x to y - 1 })
+            }
+
+            val redge = (tl.first..br.first).flatMap {
+                this.collect(it to br.second, { (x, y) -> x to y - 1 }, { (x, y) -> x to y + 1 })
+            }
+
+            val tedge = (tl.second..br.second).flatMap {
+                this.collect(tl.first to it, { (x, y) -> x + 1 to y }, { (x, y) -> x - 1 to y })
+                    .map { p -> p.second to p.first }
+            }
+
+            val bedge = (tl.second..br.second).flatMap {
+                this.collect(br.first to it, { (x, y) -> x - 1 to y }, { (x, y) -> x + 1 to y })
+                    .map { p -> p.second to p.first }
+            }
+
+            return listOf(ledge, redge, tedge, bedge).sumOf { it.countEdges() }
+
         }
 
         return calculate(input) { it.perimeter() }
@@ -89,7 +152,7 @@ fun main() {
     check(part1(trial) == 1930)
     part1(input).println()
 
-    check(part2(trial) == 81)
+    check(part2(trial) == 1206)
     part2(input).println()
 
 }
