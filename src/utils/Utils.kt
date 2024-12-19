@@ -30,3 +30,13 @@ fun <T> List<T>.toPair(): Pair<T, T> {
 }
 
 fun <T> List<String>.convert(converter: (String) -> List<T>) = this.map(converter)
+
+class Memoize<in T, out R>(val f: (T) -> R) : (T) -> R {
+    private val values = mutableMapOf<T, R>()
+    override fun invoke(v: T): R {
+        return values.getOrPut(v) {
+            val r = f(v)
+            r
+        }
+    }
+}
