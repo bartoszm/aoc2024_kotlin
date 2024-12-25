@@ -3,11 +3,12 @@ package day16
 import utils.println
 import utils.readInput
 import java.util.*
+import kotlin.collections.ArrayDeque
 import kotlin.math.abs
 
-typealias Map = Array<CharArray>
+typealias Map2D = Array<CharArray>
 
-fun Map.find(x:Char): Point {
+fun Map2D.find(x:Char): Point {
     for (i in this.indices) {
         for (j in this[i].indices) {
             if (this[i][j] == x) {
@@ -18,16 +19,16 @@ fun Map.find(x:Char): Point {
     return Point(-1, -1)
 }
 
-fun Map.at(p: Point): Char {
+fun Map2D.at(p: Point): Char {
     return this[p.first][p.second]
 }
 
-fun Map.idx(p: Point): Int {
+fun Map2D.idx(p: Point): Int {
     if(p.first < 0 || p.first >= this.size || p.second < 0 || p.second >= this[0].size) throw IndexOutOfBoundsException()
     return p.first * this[0].size + p.second
 }
 
-fun Map.size() = this.size * this[0].size
+fun Map2D.size() = this.size * this[0].size
 
 
 typealias Point = Pair<Int, Int>
@@ -44,12 +45,8 @@ fun Point.turnRight():Point {
     return turns[(idx + 3) % 4]
 }
 
-fun Point.distance(other: Point): Point {
-    return abs(this.first - other.first) to abs(this.second - other.second)
-}
 
-
-fun parse(input: List<String>): Map {
+fun parse(input: List<String>): Map2D {
     return input.map { it.toCharArray() }.toTypedArray()
 }
 
@@ -59,146 +56,71 @@ data class Node(val id: Point, val distance: Int, val dir: Point): Comparable<No
     }
 }
 
-fun Map.dijkstra(start: Point, end: Point): Pair<Int, Point> {
-    val distances = IntArray(this.size()) { Int.MAX_VALUE }
-    val priorityQueue = PriorityQueue<Node>()
+data class Result(val distance: Int, val dir: Point, val predecessors: Map<Point, Set<Point>>)
 
-    distances[this.idx(start)] = 0
-    priorityQueue.add(Node(start, 0, turns[0]))
+fun Map2D.forward(n: Node): Node? {
+    val dir = n.dir
+    val newPos = Point(n.id.first + dir.first, n.id.second + dir.second)
+    return if (this.at(newPos) != '#') Node(newPos, n.distance + 1, dir) else null
+}
 
-    while (priorityQueue.isNotEmpty()) {
-        val currentNode = priorityQueue.poll()
-        val currentDistance = currentNode.distance
-        val currentId = currentNode.id
+fun left(n: Node) = Node(n.id, n.distance + 1000, n.dir.turnLeft())
+fun right(n: Node) = Node(n.id, n.distance + 1000, n.dir.turnRight())
 
-        if (currentId == end) {
-            return currentDistance to currentNode.dir
-        }
+fun Map2D.traverse(): Pair<Int, MutableMap<Node, MutableSet<Node>>> {
+    val start = this.find('S')
+    val end = this.find('E')
+    val predecessors = mutableMapOf<Node, MutableSet<Node>>()
 
-        if (currentDistance > distances[this.idx(currentId)]) continue
+    val queue = PriorityQueue<Node>()
+    queue.add(Node(start, 0, turns[0]))
+    val visited = mutableSetOf<Pair<Point, Point>>()
 
-        val dir = currentNode.dir
+    while(queue.isNotEmpty()) {
+        val current = queue.poll()
+        if(current.id == end) return current.distance to predecessors
+        if(visited.add(current.id to current.dir)) {
+            sequenceOf(
+                this.forward(current),
+                left(current),
+                right(current)
+            ).filterNotNull().forEach {
 
-        val next = sequenceOf(
-            dir to 0,
-            dir.turnLeft() to 1000,
-            dir.turnRight() to 1000
-        ).map { (d, c) ->
-            val newPos = Point(currentId.first + d.first, currentId.second + d.second)
-            Triple(newPos, d, c + 1)
-        }.filter {
-            this.at(it.first) != '#'
-        }.toList()
-
-        for (edge in next) {
-            val newDistance = currentDistance + edge.third
-            val idx = this.idx(edge.first)
-
-            if (newDistance < distances[idx]) {
-                distances[idx] = newDistance
-                priorityQueue.add(Node(edge.first, newDistance, edge.second))
+                predecessors.computeIfAbsent(it){ mutableSetOf()}.add(current)
+                queue.add(it)
             }
         }
     }
-
-    return Int.MAX_VALUE to turns[0]
+    return -1 to predecessors
 }
 
 
 fun main() {
-
-//    fun part1(input: List<String>): Int {
-//        var currentBest = Int.MAX_VALUE
-//
-//        val map = parse(input)
-//
-//        fun Map.dfs(pos: Point, visited: Set<Point>, dir: Point, cost: Int): Int {
-//            if (this.at(pos) == 'E') {
-//                if(cost < currentBest) currentBest = cost
-//                return cost
-//            }
-//
-//            val next  = sequenceOf(
-//                dir to 0,
-//                dir.turnLeft() to 1000,
-//                dir.turnRight() to 1000
-//            ).map { (d, c) ->
-//                val newPos = Point(pos.first + d.first, pos.second + d.second)
-//                Triple(newPos, d, c + 1)
-//            }.filter {
-//                this.at(it.first) != '#' && it.first !in visited
-//            }.filter {
-//                it.third + cost < currentBest
-//            }.toList()
-//
-//            return next.minOfOrNull {
-//                this.dfs(it.first, visited + it.first, it.second, cost + it.third)
-//            } ?: Int.MAX_VALUE
-//        }
-//
-//        map.dfs(map.find('S'), setOf(map.find('S')), turns[0], 0).let {
-//            return it
-//        }
-//
-//
-//    }
-
     fun part1(input: List<String>): Int {
         val map = parse(input)
-        return map.dijkstra(map.find('S'), map.find('E')).first
+        return map.traverse().first
     }
 
     fun part2(input: List<String>): Int {
         val map = parse(input)
+        val endPos = map.find('E')
+        val (_, predecessors) = map.traverse()
+        val end = predecessors.keys.first{ it.id == endPos }
 
-        val start = map.find('S')
-        val end = map.find('E')
-
-        val(fuel, dir) = map.dijkstra(start, end)
-
-        val allPaths = mutableListOf<List<Point>>()
-        val currentPath = mutableListOf<Point>()
-
-        fun Map.dfs(currentNode: Point, currentDir: Point, fuelLeft: Int) {
-            currentPath.add(currentNode)
-
-            if((fuelLeft == 0 || fuelLeft == 1000) && currentNode == start) {
-                allPaths.add(currentPath.toList())
-            } else {
-                val next  = sequenceOf(
-                    currentDir to 0,
-                    currentDir.turnLeft() to 1000,
-                    currentDir.turnRight() to 1000
-                ).map { (d, c) ->
-                    val newPos = Point(currentNode.first + d.first, currentNode.second + d.second)
-                    Triple(newPos, d, c + 1)
-                }.filter {
-                    this.at(it.first) != '#'
-                }.toList()
-
-                for (edge in next) {
-                    val newFuel = fuelLeft - edge.third
-
-                    val dist = edge.first.distance(start)
-                    val est = dist.toList().sum() + if(dist.toList().any { it == 0 }) 0 else 1000
-
-                    if(newFuel >= est) {
-                        this.dfs(edge.first, edge.second, newFuel)
-                    }
-                }
+        val queue = ArrayDeque<Node>()
+        queue.add(end)
+        return sequence {
+            while (queue.isNotEmpty()) {
+                val current = queue.removeFirst()
+                yield(current.id)
+                val pred = predecessors[current] ?: emptySet()
+                queue.addAll(pred)
             }
-            currentPath.removeAt(currentPath.size - 1)
-        }
-
-        map.dfs(end, dir.turnRight().turnRight(), fuel)
-
-        return allPaths.flatten().distinct().size
+        }.toSet().size
     }
 
     val trial = readInput("day16")
-//    val test = readInput("day16","test")
     val input = readInput("day16", "input")
-//    part1(test).println()
 
     check(part1(trial) == 7036)
     part1(input).println()
