@@ -31,6 +31,13 @@ fun <T> List<T>.toPair(): Pair<T, T> {
 
 fun <T> List<String>.convert(converter: (String) -> List<T>) = this.map(converter)
 
+
+fun <T> List<T>.combine(): List<Pair<T, T>> {
+    return this.flatMapIndexed { i, a ->
+        this.subList(i + 1, this.size).map { b -> a to b }
+    }
+}
+
 class Memoize<in T, out R>(val f: (T) -> R) : (T) -> R {
     private val values = mutableMapOf<T, R>()
     override fun invoke(v: T): R {
